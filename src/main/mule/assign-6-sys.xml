@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:email="http://www.mulesoft.org/schema/mule/email" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/email http://www.mulesoft.org/schema/mule/email/current/mule-email.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="fc716cef-e82f-44e9-9b44-068057420303" >
+		<http:listener-connection host="0.0.0.0" port="8083" />
+	</http:listener-config>
+	<email:smtp-config name="Email_SMTP" doc:name="Email SMTP" doc:id="e45ab2c1-eda8-4437-9ba6-2bf2c94da8a7" >
+		<email:smtp-connection host="smtp.gmail.com " port="587" user="asamohanlakshman@gmail.com" password="9966653004" connectionTimeout="50" readTimeout="50">
+			<email:properties >
+				<email:property key="mail.smtp.starttls.enable" value="true" />
+			</email:properties>
+		</email:smtp-connection>
+	</email:smtp-config>
+	<email:smtp-config name="Email_SMTP1" doc:name="Email SMTP" doc:id="4f0d9fc1-50d5-4fd7-85c5-04e294541194" >
+		<email:smtp-connection host="smtp.gmail.com" port="587" user="asamohanlakshman@gmail.com" password="9966653004">
+			<email:properties >
+				<email:property key="mail.smtp.starttls.enable" value="true" />
+			</email:properties>
+		</email:smtp-connection>
+	</email:smtp-config>
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="0a05fecc-c3b7-4397-8709-050bf823f8b1" >
+		<db:my-sql-connection host="localhost" port="3306" user="root" password="123456" database="employee" />
+	</db:config>
+	<vm:config name="VM_Config" doc:name="VM Config" doc:id="e31efe2e-18cb-4923-883b-86d5ebe37c14" >
+		<vm:queues >
+			<vm:queue queueName="vmm" queueType="PERSISTENT"/>
+		</vm:queues>
+	</vm:config>
+	<http:request-config name="HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="8793a803-4909-4351-adbb-7dcdb240ea43" >
+		<http:request-connection host="localhost" port="8083" />
+	</http:request-config>
+	<flow name="mailFlow" doc:id="3d6d6b2f-7cb1-476a-8107-ba14b30fbc26" >
+		<http:listener doc:name="Listener" doc:id="aacf4d8b-50bb-4429-a4e5-0f2535e4039c" config-ref="HTTP_Listener_config" path="/mail"/>
+		<ee:transform doc:name="Transform Message" doc:id="3328621c-5c7f-472e-85ff-77ee7a69523b" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="mailFlow1" doc:id="cb00c858-9f55-41f5-9bf6-d42c586a88fc" >
+		<http:listener doc:name="Listener" doc:id="8c83a6af-9406-42d4-8c20-017a696045b8" config-ref="HTTP_Listener_config" path="/db"/>
+		<db:select doc:name="Select" doc:id="b04c8d88-745b-4cb6-b45e-76d25adf1c76" config-ref="Database_Config">
+			<db:sql ><![CDATA[select * from emp where empID =:emp]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	emp: attributes.queryParams.empID
+}]]]></db:input-parameters>
+		</db:select>
+		<choice doc:name="Choice" doc:id="1ec360b1-d232-40ce-bb37-58cde294d12d" >
+			<when expression="#[sizeOf(payload)&gt;0]">
+				<ee:transform doc:name="Transform Message" doc:id="c44ae17a-9d10-490e-8127-81e590c55246" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</when>
+			<when expression="#[payload==[]]">
+				<ee:transform doc:name="Transform Message" doc:id="704f25cb-2c00-467b-9ec1-13506bf3a0e0" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+message: "there is no data for your id"
+
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</when>
+			<otherwise >
+				<db:select doc:name="Select" doc:id="c623d6d6-3b04-4a02-a1dc-f31e7e7bee5e" config-ref="Database_Config">
+					<db:sql ><![CDATA[select * from emp]]></db:sql>
+				</db:select>
+				<ee:transform doc:name="Transform Message" doc:id="c203a86f-3cfe-4653-95db-03ec0b5201f5" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+	</flow>
+	<flow name="assign-6-sys" doc:id="159b93f1-2abe-4f0f-81a0-4298a65a3dd6" >
+		<db:select doc:name="Select" doc:id="59d0de5d-0462-4efb-9521-8ff8c02e167f" config-ref="Database_Config">
+			<db:sql ><![CDATA[select * from emp where empID = :emp1]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	"emp1" : attributes.uriParams.empID
+}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="94895053-0c4c-4f2b-bdaf-a453ab8ac4d5" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="d5bea0c5-900f-435b-b521-70adfbbae7f8" >
+				<email:send doc:name="Send" doc:id="bba47193-a455-4e97-8248-65fa7424b86f" config-ref="Email_SMTP1" fromAddress="asamohanlakshman@gmail.com" subject="POC">
+					<email:to-addresses>
+						<email:to-address value="alakshman@eniquesolutions.com" />
+					</email:to-addresses>
+					<email:body contentType="text/plain">
+						<email:content><![CDATA[The system layer is down]]></email:content>
+					</email:body>
+				</email:send>
+				<vm:publish queueName="vmm" doc:id="70b5f4fc-dffc-43cb-b175-2bdd187b8ba1" config-ref="VM_Config" doc:name="Publish" >
+					<vm:content ><![CDATA[#[attributes.uriParams.empID]]]></vm:content>
+				</vm:publish>
+				<ee:transform doc:name="Transform Message" doc:id="1e5ee821-b8cd-4d56-9ce2-f70c39462165" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	message:"your request has been recieved for value " ++ attributes.uriParams.empID as String,
+	transactionId: correlationId
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<email:send doc:name="Send" doc:id="5f70ba92-0492-4ca2-bb3c-846034ec1b57" config-ref="Email_SMTP1" fromAddress="asamohanlakshman@gmail.com" subject="POC" >
+					<email:to-addresses >
+						<email:to-address value="alakshman@eniquesolutions.com" />
+					</email:to-addresses>
+					<email:body contentType="text/plain" >
+						<email:content ><![CDATA[#[payload.message ++ " these is your transactionId " ++ payload.transactionId]]]></email:content>
+					</email:body>
+				</email:send>
+			</on-error-continue>
+		</error-handler>
+	</flow>
+	<flow name="assign-6-sysFlow" doc:id="86e099e1-1b81-43d1-9dd9-bec10d49e064" >
+		<vm:listener doc:name="Listener" doc:id="a9924102-ad21-4a23-b380-f7648724eea6" config-ref="VM_Config" queueName="vmm" timeout="15"/>
+		<db:select doc:name="Select" doc:id="a224fc1f-fef8-4a19-84fd-441202582820" config-ref="Database_Config" >
+			<db:sql ><![CDATA[select * from emp where empID = :emp1]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	"emp1" : payload
+}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="0d36c3fc-88ff-4b38-b53d-0df3f81c7604" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>
